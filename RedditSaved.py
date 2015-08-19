@@ -2,7 +2,7 @@ import praw
 
 saved = []
 save_dict = {}
-r = praw.Reddit(user_agent = "")
+r = praw.Reddit(user_agent = "save-to-subreddit")
 username = raw_input(">>Username:")
 password = raw_input(">>Password:")
 subreddit = raw_input(">>Subreddit (without /r/)")
