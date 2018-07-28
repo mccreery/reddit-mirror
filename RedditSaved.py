@@ -4,10 +4,10 @@ import praw, datetime, argparse, sys
 
 def yn(message):
     while True:
-        answer = input(message + " (y/n): ")
-        if answer.lower() in ("y", "yes"):
+        answer = input(message + " (y/n): ").lower()
+        if answer in ("y", "yes"):
             return True
-        elif answer.lower() in ("n", "no"):
+        elif answer in ("n", "no"):
             return False
 
 def format_timestamp(timestamp):
