@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
-import praw, datetime
-reddit = praw.Reddit(user_agent="save-to-subreddit")
+import praw, datetime, argparse, sys
 
 def yn(message):
     while True:
@@ -14,36 +13,58 @@ def yn(message):
 def format_timestamp(timestamp):
     return datetime.datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d")
 
-def sub_exists(sub):
+def get_subreddit(reddit, subreddit):
     try:
-        reddit.subreddits.search_by_name(sub, exact=True)
+        return reddit.subreddits.search_by_name(subreddit, exact=True)[0]
     except:
-        return False
-    return True
+        return None
 
-def get_subreddit():
+def choose_subreddit(reddit, args):
     subreddit = None
 
     while not subreddit:
-        subreddit = input("Subreddit (leave blank to mimic username): ")
+        name = None
+        if "subreddit" in args:
+            name = args.subreddit
+        elif not args.auto:
+            name = input("Subreddit (leave blank to mimic username): ")
+
+        if not name:
+            name = reddit.user.me()
+
+        subreddit = get_subreddit(reddit, name)
 
         if not subreddit:
-            username = reddit.user.me()
+            print("Could not find subreddit r/{}".format(name), file=sys.stderr)
 
-            if sub_exists(username):
-                print("Found username mimic sub r/{}".format(username))
-                subreddit = username
-            elif yn("Create private subreddit r/{} (warning: subreddits cannot be deleted)".format(username)):
-                subreddit = reddit.subreddit.create(username, subreddit_type="private")
-        elif not sub_exists(subreddit):
-            print("Could not find subreddit r/{}".format(subreddit))
-            subreddit = None
+            if "no_create" in args:
+                if args.auto:
+                    sys.exit(1)
+                elif "subreddit" in args:
+                    del args.subreddit
+            elif args.auto or yn("Create private subreddit r/{} (warning: subreddits cannot be deleted)".format(name)):
+                subreddit = reddit.subreddit.create(name, subreddit_type="private")
+                print("Created private subreddit r/{}".format(name))
 
     return subreddit
 
 if __name__ == "__main__":
-    subreddit = get_subreddit()
-    delete_saved = yn("Unsave mirrored posts")
+    reddit = praw.Reddit(user_agent="save-to-subreddit")
+
+    parser = argparse.ArgumentParser(description="Mirror posts from \"saved\" to a subreddit using crossposts")
+    parser.add_argument("-a", "--auto", action="store_true", help="do not prompt the user")
+
+    parser.add_argument("-s", "--subreddit", "--sub", help="post to the given subreddit; r/username if omitted", default=argparse.SUPPRESS)
+    parser.add_argument("-n", "--no-create", action="store_true", help="do not create a new subreddit; crash in auto mode", default=argparse.SUPPRESS)
+    parser.add_argument("-k", "--keep", action="store_true", help="do not unsave posts in auto mode", default=argparse.SUPPRESS)
+
+    args = parser.parse_args()
+    subreddit = choose_subreddit(reddit, args)
+
+    if args.auto:
+        delete_saved = "keep" not in args
+    else:
+        delete_saved = yn("Unsave mirrored posts")
     print("Finding saved posts...")
 
     posts = sorted(reddit.user.me().saved(limit=None), key=lambda post: post.created)
@@ -54,11 +75,10 @@ if __name__ == "__main__":
             format_timestamp(posts[0].created),
             format_timestamp(posts[-1].created)))
 
-        if yn("Mirror posts"):
-            print("Mirroring saved posts to r/{}...".format(subreddit))
+        print("Mirroring saved posts to r/{}...".format(subreddit))
 
-            for post in posts:
-                post.crosspost(subreddit)
-                if delete_saved: post.unsave()
+        for post in posts:
+            post.crosspost(subreddit)
+            if delete_saved: post.unsave()
     else:
         print("No saved posts found")
