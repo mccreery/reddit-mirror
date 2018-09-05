@@ -67,7 +67,9 @@ if __name__ == "__main__":
         delete_saved = yn("Unsave mirrored posts")
     print("Finding saved posts...")
 
-    posts = sorted(reddit.user.me().saved(limit=None), key=lambda post: post.created)
+    posts = reddit.user.me().saved(limit=None)
+    posts = filter(lambda post: isinstance(post, praw.models.Submission), posts)
+    posts = sorted(posts, key=lambda post: post.created)
 
     if posts:
         print("Found {} saved posts between {} and {}".format(
